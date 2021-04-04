@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:math_expressions/math_expressions.dart';
 
 class ChallengeInfo {
@@ -14,12 +13,16 @@ ChallengeInfo extractChallenge(String challengeString, String sessionToken) {
   var maskTokenMatch = RegExp(r"decode\.call\(this, '(.+?)'\);");
   var offsetExpMatch = RegExp(r'var\soffset\s?=\s?(.+?);');
 
-  var maskToken = maskTokenMatch.firstMatch(challengeString).group(1);
+  var maskToken = maskTokenMatch.firstMatch(challengeString)?.group(1);
   var offsetExpression = offsetExpMatch
       .firstMatch(challengeString)
-      .group(1)
-      .trim()
+      ?.group(1)
+      ?.trim()
       .replaceAll(RegExp(r'\s'), '');
+      
+  if (maskToken == null || offsetExpression == null) {
+    throw Exception('maskToken or offsetExpression is null');
+  }
 
   return ChallengeInfo(sessionToken, maskToken, offsetExpression);
 }

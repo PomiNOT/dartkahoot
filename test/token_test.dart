@@ -9,7 +9,7 @@ void main() {
   final sessionToken = 'J35eV1MFfg5FGl1Bb20ORT1VVkB+fWMMCRNQCwJFTQNdYzV3WWQIP2lCAARfVFV4KQgOZh0FYhJcd304QVZGJlNwORwFbFluFAoGR3xyUCQsIUVVd3daAUQtZAALXlp+';
 
   group('Extracting and decoding', () {
-    test('Extract a token', () {
+    test('Extract challenge info', () {
       var challengeInfo = extractChallenge(inputChallenge, sessionToken);
 
       expect(challengeInfo.sessionToken, equals(sessionToken));
@@ -20,7 +20,7 @@ void main() {
       expect(challengeInfo.offsetExpression, equals('(41+32+(49*37))*59*28'));
     });
 
-    test('Decode a token', () {
+    test('Decode token', () {
       var challengeInfo = extractChallenge(inputChallenge, sessionToken);
       var decodedToken = decodeToken(challengeInfo);
 

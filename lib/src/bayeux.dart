@@ -1,26 +1,51 @@
+import 'dart:async';
 import 'dart:convert';
-
 import 'package:web_socket_channel/io.dart';
 
 class BayeuxWSClient {
-  final String _server;
+  final String server;
 
   int _id = 0;
   String _clientId = '';
   Map<String, List<void Function(dynamic)>> subscribers = {};
+  void Function()? onConnect;
+  void Function()? onDisconnect;
+  Timer? _pingTimer;
 
-  late Stream _pingStream;
   late IOWebSocketChannel _client;
 
-  BayeuxWSClient(this._server) {
-    _client = IOWebSocketChannel.connect(Uri.parse(_server));
+  BayeuxWSClient(this.server, {this.onConnect, this.onDisconnect}) {
+    _client = IOWebSocketChannel.connect(Uri.parse(server));
     _client.stream.listen((message) => _handleWSMessage(message));
 
     subscribe('/meta/handshake', (m) {
       if (m['successful']) {
         _clientId = m['clientId'];
-        _pingStream = Stream.periodic(Duration(seconds: 15));
-        _pingStream.listen((_) => _ping());
+        _pingTimer = Timer.periodic(Duration(seconds: 15), (_) => _ping());
+
+        if (onConnect != null) {
+          onConnect!();
+        }
+      }
+    });
+
+    subscribe('/meta/connect', (m) {
+      if (!m['successful'] && _pingTimer != null) {
+        _pingTimer!.cancel();
+      }
+    });
+
+    subscribe('/meta/disconnect', (m) {
+      if (m['successful']) {
+        if (onDisconnect != null) {
+          onDisconnect!();
+        }
+
+        if (_pingTimer != null) {
+          _pingTimer!.cancel();
+        }
+
+        _client.sink.close();
       }
     });
 
@@ -36,10 +61,7 @@ class BayeuxWSClient {
   }
 
   void publish(String channel, dynamic data) {
-    _sendToChannel(channel, {
-      'data': data,
-      'clientId': _clientId
-    });
+    _sendToChannel(channel, {'data': data, 'clientId': _clientId});
   }
 
   void _handleWSMessage(String message) {
@@ -79,5 +101,9 @@ class BayeuxWSClient {
       'clientId': _clientId,
       'connectionType': 'websocket'
     });
+  }
+
+  void disconnect() {
+    _sendToChannel('/meta/disconnect', {'clientId': _clientId});
   }
 }

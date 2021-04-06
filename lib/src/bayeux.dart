@@ -1,20 +1,24 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:dartkahoot/src/extension.dart';
 import 'package:web_socket_channel/io.dart';
 
 class BayeuxWSClient {
   final String server;
-
   int _id = 0;
   String _clientId = '';
+
   Map<String, List<void Function(dynamic)>> subscribers = {};
   void Function()? onConnect;
   void Function()? onDisconnect;
   Timer? _pingTimer;
 
+  Map<String, BayeuxExtension>? extensions = {};
+
   late IOWebSocketChannel _client;
 
-  BayeuxWSClient(this.server, {this.onConnect, this.onDisconnect}) {
+  BayeuxWSClient(this.server,
+      {this.onConnect, this.onDisconnect, this.extensions}) {
     _client = IOWebSocketChannel.connect(Uri.parse(server));
     _client.stream.listen((message) => _handleWSMessage(message));
 
@@ -53,10 +57,7 @@ class BayeuxWSClient {
   }
 
   void subscribe(String channel, void Function(dynamic) callback) {
-    if (!subscribers.containsKey(channel)) {
-      subscribers[channel] = [];
-    }
-
+    subscribers[channel] ??= [];
     subscribers[channel]!.add(callback);
   }
 
@@ -64,10 +65,18 @@ class BayeuxWSClient {
     _sendToChannel(channel, {'data': data, 'clientId': _clientId});
   }
 
-  void _handleWSMessage(String message) {
-    print(message);
+  void disconnect() {
+    _sendToChannel('/meta/disconnect', {'clientId': _clientId});
+  }
 
+  void _handleWSMessage(String message) {
     dynamic m = jsonDecode(message)[0];
+
+    if (extensions != null && m['ext'] != null) {
+      m['ext'].forEach((name, response) {
+        extensions![name]?.onReceive(response);
+      });
+    }
 
     if (subscribers.containsKey(m['channel'])) {
       for (var cb in subscribers[m['channel']]!) {
@@ -79,9 +88,27 @@ class BayeuxWSClient {
   void _sendToChannel(String channel, Map<String, dynamic> object) {
     _id++;
 
-    _client.sink.add(jsonEncode([
-      {'id': _id, 'channel': channel, ...object}
-    ]));
+    var data = {
+      'id': _id,
+      'channel': channel,
+      ...object,
+      'ext': _getExtensionData()
+    };
+
+    _client.sink.add(jsonEncode([data]));
+  }
+
+  Map<String, Map<String, dynamic>> _getExtensionData() {
+    // ignore: omit_local_variable_types
+    Map<String, Map<String, dynamic>> result = {};
+
+    if (extensions != null) {
+      extensions!.forEach((name, ext) {
+        result[name] = ext.onSend();
+      });
+    }
+
+    return result;
   }
 
   void _handshake() {
@@ -101,9 +128,5 @@ class BayeuxWSClient {
       'clientId': _clientId,
       'connectionType': 'websocket'
     });
-  }
-
-  void disconnect() {
-    _sendToChannel('/meta/disconnect', {'clientId': _clientId});
   }
 }

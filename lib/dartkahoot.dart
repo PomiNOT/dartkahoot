@@ -1,3 +1,3 @@
 library dartkahoot;
 
-export 'src/token.dart';
+export 'src/client.dart';

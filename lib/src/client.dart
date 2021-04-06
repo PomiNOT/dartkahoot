@@ -1,6 +1,7 @@
 import 'package:dartkahoot/src/bayeux.dart';
-import 'package:http/http.dart' as http;
+import 'package:dartkahoot/src/timesync.dart';
 import 'package:json_annotation/json_annotation.dart';
+import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'token.dart';
 
@@ -49,10 +50,15 @@ class KahootClient {
     var token = decodeToken(
         extractChallenge(gameInfo.challenge, gameInfo.sessionToken!));
 
-    _client =
-        BayeuxWSClient('wss://kahoot.it/cometd/$pin/$token', onConnect: () {
+    _client = BayeuxWSClient(
+      'wss://kahoot.it/cometd/$pin/$token',
+      onConnect: () {
       _login();
-    });
+      },
+      extensions: {
+        'timesync': TimeSyncExtension()
+      }
+    );
   }
 
   void exitGame() {
